@@ -23,6 +23,10 @@
     "mtnewswire": {
       "type": "http",
       "url": "https://vast-mcp.blueskyapi.com/mtnewswires"
+    },
+    "akshare-one": {
+      "command": "uvx",
+      "args": ["akshare-one-mcp"]
     }
   }
 }
