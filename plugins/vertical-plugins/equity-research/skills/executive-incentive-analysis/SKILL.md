@@ -34,6 +34,8 @@ Always work from primary disclosure. Never infer comp figures from secondary agg
 
 If the company is dual-listed or VIE-structured, reconcile across regimes and flag where disclosures differ (US ADR proxies vs. HK annual report often differ in scope).
 
+**A-share data tooling.** The cninfo filings above are the source of record; two tools speed up retrieval. Use the **akshare-one MCP** for management share transactions and holdings (高管增减持, 持股变动) — it pulls the disclosure-derived data directly, and it is the primary tool for filling the stake-bridge in step 4. Use the **tushare Python SDK** (token at `~/.config/tushare/token`; call `pro.income` / `pro.balancesheet` / `pro.fina_indicator` / `pro.daily_basic`) for the financial and market-cap base — shares outstanding, market value, and the financial backdrop a comp figure is sized against. Note the boundary: tushare's announcement endpoint (`anns_d`) is gated behind higher credit tiers and may be unavailable, so 股权激励考核办法 and 减持公告 detail still come from cninfo filings or akshare, not tushare. Either tool is a faster path to the same primary data — never a substitute for citing the underlying filing.
+
 ## When a Primary Source Can't Be Reached
 
 Primary filings sometimes can't be fetched — a PDF host is unreachable, a fetch times out, TLS/certificate errors, rate limits, or paywalled connector data. **Do not stop the analysis, and do not silently fill the gap with secondary data dressed up as primary.** Degrade gracefully instead:
@@ -109,5 +111,6 @@ Every figure carries a citation: filing name, period, and URL. Keep granted-vs-r
 
 ---
 
-*Version 0.2 — last updated 2026-06-05*
+*Version 0.3 — last updated 2026-06-05*
+*0.3: added A-share data-tooling note (akshare-one MCP for insider transactions, tushare SDK for financial/market-cap base).*
 *0.2: added graceful-degradation protocol for unreachable primary sources (tiered labeling + follow-up checklist).*
