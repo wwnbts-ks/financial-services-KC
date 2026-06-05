@@ -1,116 +1,79 @@
 ---
 name: executive-incentive-analysis
-description: Analyze key management incentives for a public company — total pay (cash + equity/ESOP), ESOP/equity-incentive structure benchmarked against main competitors, the performance targets and incentives those create, a multi-horizon (3/5/10-year) bridge of each executive's equity stake (shares granted, shares bought with cash, shares sold and proceeds, net change), and related-party transactions as a misalignment risk. Use when the user asks to "analyze exec comp / executive incentives", "summarize management compensation", "look at the ESOP / equity incentive plan", "compare incentives vs peers", "what are management incentivized to do", "how much did insiders / management sell", "how much have insiders bought", "insider selling", "management stake change", "related-party transactions / 关联交易", or "compensation alignment" for a named company. Covers US (DEF 14A / Form 4), HK-listed (annual report remuneration + connected transactions + HKEXnews disclosures), and China A-share (年报高管薪酬 / 股权激励 / 减持 / 增持 / 关联交易) disclosure regimes.
+description: Analyze a public company's key-management incentives — pay (cash + equity), equity-incentive structure and performance targets vs. peers, a 3/5/10-year bridge of each executive's stake (granted / bought / sold / net), and related-party transactions as a misalignment risk. Use when the user asks to analyze exec comp / executive incentives / management compensation, the ESOP or 股权激励 plan, vesting or performance targets, insider buying or selling, 减持/增持, management stake change, 关联交易, peer comparison of incentives, or compensation alignment for a named company. Covers US, HK-listed, and China A-share disclosure.
 ---
 
 # Executive Incentive Analysis
 
-Produce a concise, source-disciplined read on how a public company's **key management** is paid, what their equity incentives actually reward, and how their personal equity stake has changed over time. The goal is not to list numbers — it is to answer **"what is this management team incentivized to do, and are they buying into the story or cashing out?"**
-
-## When to Use
-
-Use when the user asks any of:
-- "Summarize [Company]'s executive / management compensation"
-- "Analyze the ESOP / equity incentive plan for [Company]"
-- "What are the vesting / performance targets, and what do they incentivize?"
-- "How much have insiders / management sold over the last 3 years?"
-- "Is management's comp aligned with shareholders?"
-
-**Do NOT use for:**
-- Full equity research initiation or earnings note → use those skills; this is a focused module that can feed into them.
-- Private companies with no public comp disclosure → state that data is unavailable rather than estimating.
+Source-disciplined read on how a company's executive management is paid, what their equity incentives reward, and whether they are buying in or cashing out. Answer: **what is management incentivized to do, and are they aligned with shareholders?** Not for full initiation/earnings notes (use those skills); for private companies with no disclosure, say so rather than estimate.
 
 ## Source Discipline ⭐ MANDATORY
 
-Always work from primary disclosure. Never infer comp figures from secondary aggregators (Salary.com, news summaries) without tracing to filing. State the filing, the period it covers, and the URL for every figure.
+Work only from primary disclosure. Cite filing, period, and URL for every figure. Never infer comp from secondary aggregators without tracing to filing.
 
-**By market:**
-
-| Market | Comp & ESOP source | Insider selling source |
+| Market | Comp & ESOP source | Insider transaction source |
 | --- | --- | --- |
-| **US** | Proxy statement (DEF 14A) — Summary Compensation Table, Grants of Plan-Based Awards, Outstanding Equity at FY-End, CD&A for targets | Form 4 / Form 144 (SEC EDGAR) for all buys, sells, grants, option exercises; 10b5-1 plan disclosures |
-| **HK-listed** | Annual report — Directors' & senior management emoluments note; share option / award scheme circulars (HKEXnews) | HKEXnews "Disclosure of Interests" (Forms 3A/3B), shareholding change filings, share pledge disclosures |
-| **China A-share** | 年报「董事、监事和高级管理人员」薪酬章节; 股权激励计划草案/考核办法 (巨潮 cninfo) | 减持/增持公告、权益变动报告书、大宗交易明细、股份质押公告 (交易所 + cninfo) |
+| **US** | DEF 14A — Summary Comp Table, Grants of Plan-Based Awards, Outstanding Equity at FY-End, CD&A | Form 4 / 144 (EDGAR); 10b5-1 plans |
+| **HK** | Annual report emoluments note; option/award scheme circulars (HKEXnews) | HKEXnews Disclosure of Interests (3A/3B), shareholding changes, pledges |
+| **A-share** | 年报「董监高」薪酬章节; 股权激励计划草案/考核办法 (cninfo) | 减持/增持公告、权益变动报告书、大宗交易、股份质押公告 (交易所 + cninfo) |
 
-If the company is dual-listed or VIE-structured, reconcile across regimes and flag where disclosures differ (US ADR proxies vs. HK annual report often differ in scope).
+For dual-listed/VIE names, reconcile across regimes and flag where disclosures differ.
 
-**A-share data tooling.** The cninfo filings above are the source of record; two tools speed up retrieval. Use the **akshare-one MCP** for management share transactions and holdings (高管增减持, 持股变动) — it pulls the disclosure-derived data directly, and it is the primary tool for filling the stake-bridge in step 4. Use the **tushare Python SDK** (token at `~/.config/tushare/token`; call `pro.income` / `pro.balancesheet` / `pro.fina_indicator` / `pro.daily_basic`) for the financial and market-cap base — shares outstanding, market value, and the financial backdrop a comp figure is sized against. Note the boundary: tushare's announcement endpoint (`anns_d`) is gated behind higher credit tiers and may be unavailable, so 股权激励考核办法 and 减持公告 detail still come from cninfo filings or akshare, not tushare. Either tool is a faster path to the same primary data — never a substitute for citing the underlying filing.
+**A-share tooling** (faster path to the same primary data, never a substitute for citing the filing): use **akshare-one MCP** for 高管增减持/持股变动 (primary tool for the step-4 bridge); use **tushare SDK** (token at `~/.config/tushare/token`; `pro.income`/`balancesheet`/`fina_indicator`/`daily_basic`) for shares outstanding, market cap, and financial base. tushare `anns_d` (announcements) is gated/often unavailable, so 考核办法 and 减持公告 text come from cninfo or akshare.
+
+**Local cache:** save every retrieved filing to `./research-cache/<ticker>/` (e.g. `./research-cache/002050.SZ/`); also where the user drops manual downloads. Check this folder first and read from disk before re-fetching.
 
 ## When a Primary Source Can't Be Reached
 
-Primary filings sometimes can't be fetched — a PDF host is unreachable, a fetch times out, TLS/certificate errors, rate limits, or paywalled connector data. **Do not stop the analysis, and do not silently fill the gap with secondary data dressed up as primary.** Degrade gracefully instead:
+A-share/HK filings often can't be fetched (blocked PDFs, timeouts, TLS/proxy errors; akshare/tushare don't cover 考核办法 or full 减持公告 text). For a **core** input (annual report, incentive plan, 减持/增持 disclosure), in order:
 
-1. **Name the gap precisely** — which document, which issuer, and why it failed (e.g., "could not retrieve 三花智控 2024 限制性股票激励计划 from cninfo — fetch failed"). Do not just omit the line.
-2. **Use what you do have, labeled by tier.** Mark every figure as **[primary]** (traced to a filing) or **[secondary, unverified]** (from search snippets, news, aggregators pending confirmation). A secondary number is acceptable as a placeholder *only* if it carries this label and a note to confirm against the filing.
-3. **Produce the partial analysis anyway** — the sections you can support stand; the blocked sections show what's missing rather than a fabricated number or a dead stop.
-4. **End with a "Primary sources to confirm" checklist** — the exact filings still needed, with the issuer/section/expected location, so a human can pull them manually.
+1. **Try alternate tools** — akshare for the same data point, tushare for series data. Exhaust automated paths first.
+2. **Still missing → STOP and ask the user.** Do not fabricate or substitute a secondary number for a core input. State: **what's missing** (exact document, e.g. "三花智控 2024年报"), **where to get it** (cninfo 公告页 / HKEXnews / EDGAR + search term), **where to put it** (`./research-cache/<ticker>/`, full path). Ask them to reply when done.
+3. **Resume** from the pause point when the user confirms — read from the cache folder, don't restart.
+4. **Labeled partial, last resort only** (user declines / file doesn't exist): mark each figure **[primary]** or **[secondary, unverified]**, leave blocked sections marked missing not guessed, end with a "Primary sources to confirm" checklist.
 
-The rule is unchanged — conclusions rest on primary disclosure — but a fetch failure produces a *labeled, honest partial* with a follow-up list, never a confident number that was never verified and never a 1-minute stall that ends in an error.
+The stall is deliberate and informative — never silent, never a fabricated fill.
 
 ## Workflow
 
-### 1. Define "key management"
-Scope is **executive management only**. Include executive directors and senior management (US: NEOs; HK: executive directors + senior management; A-share: 执行董事 + 高级管理人员). **Exclude non-executive directors, independent directors, and (for A-share) 监事 / supervisors** — they are not running the business and their incentives are a separate question. State explicitly who is in scope, and do not silently broaden or narrow the set.
+**0. Output language.** Ask up front: 中文为主还是英文为主. Keep proper nouns, filing names, financial terms in original form either way (减持公告, DEF 14A, RSU). Don't re-ask within a run.
 
-### 2. Compensation summary (Requirement 1)
-For each key executive and the most recent disclosed fiscal year (plus 1-2 prior years for trend):
-- **Cash**: base salary + cash bonus / non-equity incentive.
-- **Equity/ESOP**: grant-date fair value of options + RSUs/PSUs/restricted shares; note this is *granted* value, not realized.
-- **Other**: pension, perquisites, other.
-- **Total**, and the **cash vs. equity mix** (a high-equity mix signals longer-horizon alignment; a high-cash mix the opposite).
+**1. Define key management.** Executive management only — executive directors + senior management (US: NEOs; A-share: 执行董事 + 高管). **Exclude** non-executive/independent directors and A-share 监事. State who is in scope.
 
-Present as one clean table. Distinguish clearly between **granted** (fair value at grant) and **realized/realizable** (what they actually got) — conflating these is the most common error.
+**2. Compensation summary (Req 1).** Per executive, latest FY + 1-2 prior for trend, as one table: cash (base + bonus); equity (grant-date fair value of options/RSUs/PSUs); other (pension, perks); total; cash-vs-equity mix. Keep **granted** (fair value at grant) distinct from **realized** — conflating them is the most common error.
 
-### 3. ESOP / equity-incentive structure & targets (Requirement 2)
-This is the analytical core. Cover:
-- **Instrument**: options vs. RSUs vs. PSUs vs. restricted shares; strike price relative to grant-date price.
-- **Vesting**: time-based schedule, cliff, total vesting period (longer = better alignment).
-- **Performance conditions**: the actual metrics and thresholds. Quote the metric and target precisely (e.g., revenue CAGR ≥ X%, ROE ≥ Y%, relative TSR vs. an index). For A-share 股权激励, summarize the 业绩考核 grid (公司层面 + 个人层面) and the 解锁/归属比例 at each tier.
-- **Peer comparison** — benchmark against the company's main competitors. Pull the equivalent equity-incentive structure for 2-3 closest peers (same sector, comparable size) and compare on: pay mix (cash vs. equity), the *type* of performance metric used, and how demanding the thresholds are. The question is whether this company's targets are stretch goals or soft relative to what peers must hit — a target that looks fine in isolation can be revealed as easy once you see peers being held to tougher bars. Note where peers tie pay to returns/margin/relative TSR while this company rewards only growth, or vice versa. State the peer set explicitly and cite each peer's disclosure.
-- **Incentive read** — the payoff: given those metrics, what behavior is rewarded? Flag misalignment risks: targets that reward revenue growth regardless of margin/ROIC; absolute (not relative) TSR in a rising market; soft/easily-hit thresholds (especially relative to peers); repricing history; large unconditional time-vested grants.
+**3. Equity-incentive structure & targets (Req 2)** — the analytical core:
+- **Instrument**: options/RSU/PSU/restricted; strike vs. grant-date price.
+- **Vesting**: schedule, cliff, total period (longer = better alignment).
+- **Performance conditions**: actual metrics and thresholds, quoted precisely (revenue CAGR ≥ X%, ROE ≥ Y%, relative TSR). For A-share, the 业绩考核 grid (公司+个人) and 解锁/归属比例 per tier.
+- **Peer comparison**: pull the equivalent structure for 2-3 closest peers; compare pay mix, metric type, and threshold toughness. Are the targets stretch or soft relative to what peers must hit? Cite each peer's disclosure.
+- **Incentive read**: what behavior do the metrics reward? Flag misalignment — growth rewarded regardless of margin/ROIC; absolute (not relative) TSR in a rising market; soft thresholds (esp. vs. peers); repricing history; large unconditional time-vested grants.
 
-### 4. Equity stake bridge — 3 / 5 / 10 years (Requirement 3)
-For each key executive (and in aggregate), reconstruct how their personal stake changed over the trailing **3, 5, and 10 years**. The point of three horizons is to separate recent behavior from lifetime pattern — a founder may have been a net buyer for a decade but a heavy seller in the last 3 years, and that contrast is the signal.
+**4. Equity stake bridge — 3/5/10 years (Req 3).** Per executive and aggregate, for each horizon (three horizons separate recent behavior from lifetime pattern):
+- **Granted** (company-funded), **Bought** (own cash on market + outlay — strongest alignment signal), **Sold** (shares + gross proceeds; split discretionary vs. 10b5-1), **Net change** + ending stake (shares and % o/s).
+- Also: buys/sells as % of holdings at the time; **pledged shares** (material for A-share/HK founders — near-monetization without a reportable sale, flag it); lockups, secondary placements, timing vs. price highs.
+- Frame as company-funded (granted) vs. own-cash (bought) vs. outflow (sold): a stake growing only via grants while steadily selling ≠ buying with own money.
+- Where disclosure is incomplete (大宗交易 lagged price, pre-IPO grants), give the bounded figure and note the gap.
 
-For each horizon, tally:
-- **Granted** — shares received via equity awards (options exercised into shares, RSU/PSU vesting, restricted-share grants). Note this is paid for by the company, not the executive.
-- **Bought** — shares purchased with the executive's own cash on the open market, and the total cash outlay. Open-market buys are the strongest alignment signal; weight them heavily.
-- **Sold** — shares disposed of and gross proceeds. Split discretionary sales from pre-arranged-plan sales (US 10b5-1); discretionary clustered selling is more informative.
-- **Net change** in shares held, and ending stake vs. starting stake (absolute shares and % of shares outstanding).
+**5. Related-party transactions.** The most damaging misalignment often sits outside the comp table — value extracted via dealings with entities management/controllers own. From primary disclosure: **counterparties** (US related-person txns in proxy; HK connected txns Ch.14A; A-share 关联交易 + 公告), **type and scale** (sales/purchases, loans, guarantees, asset transfers, leasing, 资金占用 — quantify as % of revenue/assets/profit), **pricing fairness** (arm's length or off-market). **If large** (material, recurring, or off-market) **list explicitly as a misalignment risk** alongside step-3 flags — large RPTs enrich management regardless of incentive design. 资金占用 and guarantees for connected parties are especially serious.
 
-Beyond the counts, capture:
-- Sales/buys as a % of that executive's holdings at the time.
-- **Pledged shares** — common and material for A-share / HK founders; pledging is economically close to monetizing without a reportable sale, so flag it.
-- Context: lockup expiries, secondary placements, timing relative to results or price highs.
-
-Where horizons exceed clean disclosure (e.g., A-share 大宗交易 with lagged price, or pre-IPO grants outside the filing window), state the gap rather than fabricating — give the bounded figure and note what's missing.
-
-A useful framing: **company-funded inflow (granted) vs. own-cash inflow (bought) vs. outflow (sold)**. Management whose stake grows only through grants while they steadily sell is being paid in equity and converting it to cash — a different alignment picture from management buying with their own money.
-
-### 5. Related-party transactions
-Study related-party transactions (RPTs) separately, because the most damaging misalignment often sits outside the comp table entirely — value extracted through dealings between the company and entities the executives/controllers own or control. Identify, from primary disclosure:
-- **The counterparties** — entities connected to key management or the controlling shareholder (US: related-person transactions in the proxy; HK: connected transactions per Listing Rules Ch.14A on HKEXnews; A-share: 关联交易 section of the 年报 + 关联交易公告 on cninfo).
-- **Type and scale** — sales/purchases of goods or services, loans and guarantees, asset transfers, leasing, fund occupation (资金占用). Quantify each in currency terms and as a % of revenue / total assets / net profit.
-- **Pricing fairness** — whether terms are at arm's length or off-market; one-sided pricing is the tell.
-
-**If RPTs are large** — material in scale, recurring, or off-market in pricing — **list them explicitly as a misalignment risk** alongside the equity-incentive flags from step 3. Large RPTs mean management can be enriched regardless of how the equity incentives are designed, which can dominate the overall alignment read. State scale, counterparty, and why it's a concern; flag fund occupation and guarantees for connected parties as especially serious.
-
-### 6. Synthesis
-Two or three sentences: is comp structured for long-term value creation or near-term extraction; do the equity targets reward the right things (and how do they compare to peers); is management adding to or reducing its stake; and do related-party dealings undercut the alignment the comp structure implies. This is a judgment, stated plainly, with the evidence behind it.
+**6. Synthesis.** 2-3 sentences: long-term value creation vs. near-term extraction; do targets reward the right things (vs. peers); adding to or reducing stake; do RPTs undercut the implied alignment. A plain judgment, with evidence.
 
 ## Output Format
 
-1. **Compensation summary table** (key execs × cash / equity / total, latest FY + trend).
-2. **ESOP structure & targets** — short prose, with a targets/thresholds sub-table if multi-tier, plus a peer-comparison sub-table (this company vs. 2-3 main competitors).
-3. **Incentive read** — what the structure rewards and the misalignment flags.
-4. **Equity stake bridge table** (key exec × horizon × granted / bought (+cash) / sold (+proceeds) / net change / ending % o/s), for 3, 5, and 10 years.
-5. **Related-party transactions** — table of material RPTs (counterparty × type × scale × % of revenue/assets), with large/off-market items flagged as misalignment risk.
+1. **Compensation table** (execs × cash/equity/total, latest FY + trend).
+2. **Structure & targets** — prose + targets sub-table if multi-tier + peer-comparison sub-table.
+3. **Incentive read** — what's rewarded + misalignment flags.
+4. **Stake bridge table** (exec × horizon × granted/bought+cash/sold+proceeds/net/ending % o/s) for 3/5/10y.
+5. **Related-party transactions** — material RPTs (counterparty × type × scale × % rev/assets), large/off-market flagged.
 6. **Synthesis** — alignment verdict.
 
-Every figure carries a citation: filing name, period, and URL. Keep granted-vs-realized distinct throughout. Do not give investment advice or a buy/sell call — describe alignment, leave the conclusion to the reader.
+Every figure cites filing, period, URL. Keep granted vs. realized distinct. No buy/sell call — describe alignment, leave the conclusion to the reader.
 
 ---
 
-*Version 0.3 — last updated 2026-06-05*
-*0.3: added A-share data-tooling note (akshare-one MCP for insider transactions, tushare SDK for financial/market-cap base).*
-*0.2: added graceful-degradation protocol for unreachable primary sources (tiered labeling + follow-up checklist).*
+*Version 0.5 — last updated 2026-06-05*
+*0.5: condensed for density (removed explanatory prose and duplication; behavior unchanged).*
+*0.4: ask output language; cache to ./research-cache/<ticker>/; pause-and-request-manual-download handshake.*
+*0.3: A-share data tooling (akshare + tushare).*
+*0.2: graceful-degradation fallback.*
