@@ -34,6 +34,17 @@ Always work from primary disclosure. Never infer comp figures from secondary agg
 
 If the company is dual-listed or VIE-structured, reconcile across regimes and flag where disclosures differ (US ADR proxies vs. HK annual report often differ in scope).
 
+## When a Primary Source Can't Be Reached
+
+Primary filings sometimes can't be fetched — a PDF host is unreachable, a fetch times out, TLS/certificate errors, rate limits, or paywalled connector data. **Do not stop the analysis, and do not silently fill the gap with secondary data dressed up as primary.** Degrade gracefully instead:
+
+1. **Name the gap precisely** — which document, which issuer, and why it failed (e.g., "could not retrieve 三花智控 2024 限制性股票激励计划 from cninfo — fetch failed"). Do not just omit the line.
+2. **Use what you do have, labeled by tier.** Mark every figure as **[primary]** (traced to a filing) or **[secondary, unverified]** (from search snippets, news, aggregators pending confirmation). A secondary number is acceptable as a placeholder *only* if it carries this label and a note to confirm against the filing.
+3. **Produce the partial analysis anyway** — the sections you can support stand; the blocked sections show what's missing rather than a fabricated number or a dead stop.
+4. **End with a "Primary sources to confirm" checklist** — the exact filings still needed, with the issuer/section/expected location, so a human can pull them manually.
+
+The rule is unchanged — conclusions rest on primary disclosure — but a fetch failure produces a *labeled, honest partial* with a follow-up list, never a confident number that was never verified and never a 1-minute stall that ends in an error.
+
 ## Workflow
 
 ### 1. Define "key management"
@@ -98,4 +109,5 @@ Every figure carries a citation: filing name, period, and URL. Keep granted-vs-r
 
 ---
 
-*Version 0.1 — last updated 2026-06-05*
+*Version 0.2 — last updated 2026-06-05*
+*0.2: added graceful-degradation protocol for unreachable primary sources (tiered labeling + follow-up checklist).*
