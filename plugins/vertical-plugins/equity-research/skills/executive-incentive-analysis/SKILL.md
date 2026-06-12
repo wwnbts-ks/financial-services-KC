@@ -14,7 +14,7 @@ Work only from primary disclosure. Cite filing, period, and URL for every figure
 | Market | Comp & ESOP source | Insider transaction source |
 | --- | --- | --- |
 | **US** | DEF 14A — Summary Comp Table, Grants of Plan-Based Awards, Outstanding Equity at FY-End, CD&A | Form 4 / 144 (EDGAR); 10b5-1 plans |
-| **HK** | Annual report emoluments note; option/award scheme circulars (HKEXnews) | HKEXnews Disclosure of Interests (3A/3B), shareholding changes, pledges |
+| **HK** | Annual report: emoluments note, share-option-scheme section + year-end directors' interests snapshot (s.352); option/award scheme circulars (HKEXnews) | **DI/DION system — `di.hkex.com.hk`** (Disclosure of Interests, separate portal from HKEXnews): per-dealing director/CE forms (3A/3B, within 3 business days) + substantial-shareholder forms (1/2), dated buy/sell records, pledges — the source for the step-4 bridge |
 | **A-share** | 年报「董监高」薪酬章节; 股权激励计划草案/考核办法 (cninfo) | 减持/增持公告、权益变动报告书、大宗交易、股份质押公告 (交易所 + cninfo) |
 
 For dual-listed/VIE names, reconcile across regimes and flag where disclosures differ.
@@ -95,6 +95,7 @@ Every figure cites filing, period, URL. Keep granted vs. realized distinct. No b
 
 Hard-won failure points when running this skill on A-share / HK names. Check here first when data retrieval misbehaves.
 
+- **HK director 增减持 — the annual report and the DI system disclose DIFFERENT things; use both.** The **annual report** (Report of the Directors, Listing Rules Appendix D2 / Practice Note 5) gives only a **year-end snapshot** of each director's/CE's aggregate long/short interest (from the SFO s.352 register), plus **share-option-scheme movements during the year** (granted / exercised / lapsed / outstanding, with exercise price) — it does **not** itemize individual dealings. The **transaction-by-transaction record** — each buy / sell / pledge with its **date and price/consideration** — lives only in the **Disclosure of Interests (DI / DION) system at `di.hkex.com.hk`** (separate portal from HKEXnews), where directors/CEs must file **Form 3A/3B within 3 business days** of each dealing (substantial shareholders ≥5% file Form 1/2 on threshold and 1%-level changes). So: take the year-end holding and option structure from the annual report (Req 1/2), but build the **step-4 stake bridge** (per-sale timing, proceeds, % of holdings, vs. price highs) from the DI filings — the annual report won't date the trades.
 - **cninfo fetch fails with a TLS/cert error, but `curl` to the same host works** — the host is being resolved to a fake-IP (198.18.x.x) by a local proxy's fake-IP mode, and the fetch layer isn't using the proxy. **Use `fetch_filing.sh`**, which routes through `filing_proxy` from `config.json` (default `http://127.0.0.1:1082`) — it handles this. If fetching by hand, set `HTTPS_PROXY`/`HTTP_PROXY` to that port. Not a real certificate problem.
 - **`api.tushare.pro` is http, not https** — proxy/cert tooling that assumes https will mishandle it.
 - **tushare `anns_d` returns no permission (40203)** — announcement text is gated. 减持公告 / 股权激励考核办法 text must come from cninfo or akshare, never assume tushare has it.
@@ -113,7 +114,8 @@ Hard-won failure points when running this skill on A-share / HK names. Check her
 
 ---
 
-*Version 0.8 — last updated 2026-06-12*
+*Version 0.8.1 — last updated 2026-06-12*
+*0.8.1: HK insider source — clarified the two-tier HK regime: the annual report (App D2 / PN5) carries only the year-end s.352 interests snapshot + option-scheme movements, while the transaction-by-transaction dated buy/sell/pledge records (Form 3A/3B, 3 business days) live in the Disclosure of Interests (DI/DION) system `di.hkex.com.hk` — use the annual report for Req 1/2 holdings/structure and the DI filings for the step-4 stake bridge.*
 *0.8: performance + output — added `fetch_filing.sh` (proxy-routed, cache-first download + PDF→text) to replace hand-rolled retry loops; mandated cache-first + section-extraction (no whole-PDF context dumps); added "Execution Discipline" (locate via akshare/tushare not WebSearch; cap subagent fan-out); config.json gains `filing_proxy`, `output_dir` (final report written to a dedicated deliverable folder, separate from the cache), `default_output_language` defaulted, and self-populating peer-set slots for high-frequency tickers.*
 *0.7: folder structure — split tushare detail to references/tushare-guide.md, added config.json (token/cache/language/peers), added Gotchas section (proxy/cert, tushare/akshare boundaries, ts_code, block-trade lag, cap-rule timing).*
 *0.6: selling analysis — flag sales sized to the regulatory cap, and 10y post-sale outcome pattern (6-month stock/business change after each reduction); ESOP analysis — interrogate difficulty of achievement, esp. rigged peer-benchmark targets.*
