@@ -1,0 +1,9 @@
+{
+  "tushare_token_path": "~/.config/tushare/token",
+  "cache_dir": "./research-cache/<ticker>/",
+  "default_output_language": null,
+  "default_peer_sets": {
+    "_comment": "Optional. Pre-defined peer groups keyed by ticker, so the skill doesn't re-derive comparables each run. Leave empty to have the skill pick peers and confirm with the user. Example: \"002050.SZ\": [\"600690.SH\", \"002032.SZ\"]",
+    "002050.SZ": []
+  }
+}

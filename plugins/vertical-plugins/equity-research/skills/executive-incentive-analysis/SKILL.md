@@ -19,9 +19,11 @@ Work only from primary disclosure. Cite filing, period, and URL for every figure
 
 For dual-listed/VIE names, reconcile across regimes and flag where disclosures differ.
 
-**A-share tooling** (faster path to the same primary data, never a substitute for citing the filing): use **akshare-one MCP** for 高管增减持/持股变动 (primary tool for the step-4 bridge); use **tushare SDK** (token at `~/.config/tushare/token`; `pro.income`/`balancesheet`/`fina_indicator`/`daily_basic`) for shares outstanding, market cap, and financial base. tushare `anns_d` (announcements) is gated/often unavailable, so 考核办法 and 减持公告 text come from cninfo or akshare.
+**A-share tooling** (faster path to the same primary data, never a substitute for citing the filing): use **akshare-one MCP** for 高管增减持/持股变动 (primary tool for the step-4 bridge); use the **tushare SDK** for shares outstanding, market cap, and financial base (income/balance sheet/ratios, after-adjusted prices). For tushare endpoints, the after-adjusted-price recipe, rate-limit/format gotchas, and a one-shot snapshot template, read `references/tushare-guide.md`. tushare can't supply 考核办法 or 减持公告 text (gated `anns_d`) — those come from cninfo or akshare.
 
-**Local cache:** save every retrieved filing to `./research-cache/<ticker>/` (e.g. `./research-cache/002050.SZ/`); also where the user drops manual downloads. Check this folder first and read from disk before re-fetching.
+**Setup (`config.json`).** Read `config.json` at the start of a run for: `tushare_token_path`, `cache_dir`, `default_output_language` (skip the step-0 question if set), and `default_peer_sets` (use a pre-defined peer group for a ticker if present, else derive and confirm). If a needed value is absent, ask the user.
+
+**Local cache:** save every retrieved filing to the `cache_dir` from config (default `./research-cache/<ticker>/`, e.g. `./research-cache/002050.SZ/`); also where the user drops manual downloads. Check this folder first and read from disk before re-fetching.
 
 ## When a Primary Source Can't Be Reached
 
@@ -36,7 +38,7 @@ The stall is deliberate and informative — never silent, never a fabricated fil
 
 ## Workflow
 
-**0. Output language.** Ask up front: 中文为主还是英文为主. Keep proper nouns, filing names, financial terms in original form either way (减持公告, DEF 14A, RSU). Don't re-ask within a run.
+**0. Output language.** If `config.json` sets `default_output_language`, use it. Otherwise ask: 中文为主还是英文为主. Keep proper nouns, filing names, financial terms in original form either way (减持公告, DEF 14A, RSU). Don't re-ask within a run.
 
 **1. Define key management.** Executive management only — executive directors + senior management (US: NEOs; A-share: 执行董事 + 高管). **Exclude** non-executive/independent directors and A-share 监事. State who is in scope.
 
@@ -47,12 +49,15 @@ The stall is deliberate and informative — never silent, never a fabricated fil
 - **Vesting**: schedule, cliff, total period (longer = better alignment).
 - **Performance conditions**: actual metrics and thresholds, quoted precisely (revenue CAGR ≥ X%, ROE ≥ Y%, relative TSR). For A-share, the 业绩考核 grid (公司+个人) and 解锁/归属比例 per tier.
 - **Peer comparison**: pull the equivalent structure for 2-3 closest peers; compare pay mix, metric type, and threshold toughness. Are the targets stretch or soft relative to what peers must hit? Cite each peer's disclosure.
-- **Incentive read**: what behavior do the metrics reward? Flag misalignment — growth rewarded regardless of margin/ROIC; absolute (not relative) TSR in a rising market; soft thresholds (esp. vs. peers); repricing history; large unconditional time-vested grants.
+- **Difficulty of achievement** — the central question for any ESOP: is the target something management must genuinely perform to hit, or is it form-over-substance, set to be cleared with near-certainty? Pressure-test the threshold against history and construction, don't take it at face value. Specifically interrogate **relative/benchmark-based targets**, where the rigging usually hides: if a target is "ROE in the 80th percentile of peer group X," examine group X itself — a high percentile against a deliberately weak or loss-making peer set is a trivially low absolute bar dressed up as demanding (e.g. requiring 80th-percentile ROE among peers whose ROE is mostly poor or negative). Also check: targets set below the company's own recent actuals or trailing trend; thresholds a flat extrapolation already clears; "growth" targets achievable by inertia. State whether each target is a real hurdle or cosmetic, and show the arithmetic.
+- **Incentive read**: what behavior do the metrics reward? Flag misalignment — growth rewarded regardless of margin/ROIC; absolute (not relative) TSR in a rising market; soft thresholds (esp. vs. peers); rigged benchmark construction; repricing history; large unconditional time-vested grants.
 
 **4. Equity stake bridge — 3/5/10 years (Req 3).** Per executive and aggregate, for each horizon (three horizons separate recent behavior from lifetime pattern):
 - **Granted** (company-funded), **Bought** (own cash on market + outlay — strongest alignment signal), **Sold** (shares + gross proceeds; split discretionary vs. 10b5-1), **Net change** + ending stake (shares and % o/s).
 - Also: buys/sells as % of holdings at the time; **pledged shares** (material for A-share/HK founders — near-monetization without a reportable sale, flag it); lockups, secondary placements, timing vs. price highs.
 - Frame as company-funded (granted) vs. own-cash (bought) vs. outflow (sold): a stake growing only via grants while steadily selling ≠ buying with own money.
+- **Selling against the regulatory ceiling** — for each sale, check whether it is sized at or near the maximum the rules allow, not just its absolute size. A-share insiders face caps (e.g. ≤25% of holdings reduced per year, plus 集中竞价/大宗交易 quarterly limits); a sale that maxes out the permitted amount signals management cashing out as fast as the framework permits — a stronger negative than the raw RMB figure. (Example: 三花智控 management's reduction in Mar 2026 was sized to the annual ≤25%-of-holdings cap — i.e. selling the maximum allowed.) State, per sale, whether it is at/near the cap and which limit binds.
+- **Post-sale outcome history (10y)** — for each material reduction over the past 10 years, look at what happened in the ~6 months *after*: did the stock underperform, and did the business deteriorate (guidance cuts, margin/revenue weakness, negative news)? A repeated pattern of insiders selling shortly before negative developments is a serious signal that they sell on private information. Tabulate each historic sale → subsequent 6-month stock move and business change, and note whether a consistent pattern exists.
 - Where disclosure is incomplete (大宗交易 lagged price, pre-IPO grants), give the bounded figure and note the gap.
 
 **5. Related-party transactions.** The most damaging misalignment often sits outside the comp table — value extracted via dealings with entities management/controllers own. From primary disclosure: **counterparties** (US related-person txns in proxy; HK connected txns Ch.14A; A-share 关联交易 + 公告), **type and scale** (sales/purchases, loans, guarantees, asset transfers, leasing, 资金占用 — quantify as % of revenue/assets/profit), **pricing fairness** (arm's length or off-market). **If large** (material, recurring, or off-market) **list explicitly as a misalignment risk** alongside step-3 flags — large RPTs enrich management regardless of incentive design. 资金占用 and guarantees for connected parties are especially serious.
@@ -64,15 +69,36 @@ The stall is deliberate and informative — never silent, never a fabricated fil
 1. **Compensation table** (execs × cash/equity/total, latest FY + trend).
 2. **Structure & targets** — prose + targets sub-table if multi-tier + peer-comparison sub-table.
 3. **Incentive read** — what's rewarded + misalignment flags.
-4. **Stake bridge table** (exec × horizon × granted/bought+cash/sold+proceeds/net/ending % o/s) for 3/5/10y.
+4. **Stake bridge table** (exec × horizon × granted/bought+cash/sold+proceeds/net/ending % o/s) for 3/5/10y, with per-sale cap-check (at/near regulatory ceiling?) and a 10-year post-sale outcome column (subsequent 6-month stock/business change).
 5. **Related-party transactions** — material RPTs (counterparty × type × scale × % rev/assets), large/off-market flagged.
 6. **Synthesis** — alignment verdict.
 
 Every figure cites filing, period, URL. Keep granted vs. realized distinct. No buy/sell call — describe alignment, leave the conclusion to the reader.
 
+## Gotchas
+
+Hard-won failure points when running this skill on A-share / HK names. Check here first when data retrieval misbehaves.
+
+- **cninfo fetch fails with a TLS/cert error, but `curl` to the same host works** — the host is being resolved to a fake-IP (198.18.x.x) by a local proxy's fake-IP mode, and the fetch layer isn't using the proxy. Run with `HTTPS_PROXY`/`HTTP_PROXY` set to the proxy's local port so the fetch goes through it. Not a real certificate problem.
+- **`api.tushare.pro` is http, not https** — proxy/cert tooling that assumes https will mishandle it.
+- **tushare `anns_d` returns no permission (40203)** — announcement text is gated. 减持公告 / 股权激励考核办法 text must come from cninfo or akshare, never assume tushare has it.
+- **akshare-one MCP shows 0 servers / won't start in the desktop app** — the GUI's PATH often lacks `/opt/homebrew/bin`, so `uvx` isn't found. Use the absolute path to `uvx` in `.mcp.json`. First launch also pulls deps (slow, ~1–2 min) — not a hang.
+- **akshare covers insider transactions but not full announcement text** — for 考核办法 detail and exact 减持 terms, go to the cninfo PDF; akshare gives the structured transaction record, not the prose.
+- **A-share ts_code must be `600519.SH` / `000001.SZ` / `xxxxxx.BJ`** (uppercase, exchange suffix) or tushare/akshare return empty.
+- **大宗交易 (block-trade) price/proceeds disclosure lags** — for recent reductions the RMB proceeds may not be clean yet; give the bounded figure and flag the gap rather than guessing.
+- **Regulatory-cap check needs the rule in force at the time** — A-share reduction limits (e.g. ≤25%/yr, quarterly 集中竞价/大宗 caps) have changed over the years; confirm the cap applicable to the sale's date before calling it "顶格".
+- **Financials lag disclosure (~T+1)** — near a reporting date, reconcile tushare numbers against the cninfo filing.
+
+## Files
+
+- `references/tushare-guide.md` — tushare endpoints, after-adjusted-price recipe, gotchas, snapshot template. Read when pulling A-share financials/prices.
+- `config.json` — token path, cache dir, default language, default peer sets. Read at start of run.
+
 ---
 
-*Version 0.5 — last updated 2026-06-05*
+*Version 0.7 — last updated 2026-06-05*
+*0.7: folder structure — split tushare detail to references/tushare-guide.md, added config.json (token/cache/language/peers), added Gotchas section (proxy/cert, tushare/akshare boundaries, ts_code, block-trade lag, cap-rule timing).*
+*0.6: selling analysis — flag sales sized to the regulatory cap, and 10y post-sale outcome pattern (6-month stock/business change after each reduction); ESOP analysis — interrogate difficulty of achievement, esp. rigged peer-benchmark targets.*
 *0.5: condensed for density (removed explanatory prose and duplication; behavior unchanged).*
 *0.4: ask output language; cache to ./research-cache/<ticker>/; pause-and-request-manual-download handshake.*
 *0.3: A-share data tooling (akshare + tushare).*
