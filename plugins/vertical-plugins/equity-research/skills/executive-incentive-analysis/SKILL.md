@@ -21,15 +21,27 @@ For dual-listed/VIE names, reconcile across regimes and flag where disclosures d
 
 **A-share tooling** (faster path to the same primary data, never a substitute for citing the filing): use **akshare-one MCP** for 高管增减持/持股变动 (primary tool for the step-4 bridge); use the **tushare SDK** for shares outstanding, market cap, and financial base (income/balance sheet/ratios, after-adjusted prices). For tushare endpoints, the after-adjusted-price recipe, rate-limit/format gotchas, and a one-shot snapshot template, read `references/tushare-guide.md`. tushare can't supply 考核办法 or 减持公告 text (gated `anns_d`) — those come from cninfo or akshare.
 
-**Setup (`config.json`).** Read `config.json` at the start of a run for: `tushare_token_path`, `cache_dir`, `default_output_language` (skip the step-0 question if set), and `default_peer_sets` (use a pre-defined peer group for a ticker if present, else derive and confirm). If a needed value is absent, ask the user.
+**Setup (`config.json`).** Read `config.json` at the start of a run for: `tushare_token_path`, `cache_dir`, `output_dir` (where the final report is written — see Output Format), `filing_proxy` (the local proxy port to route filing downloads through — required for cninfo, see Gotchas), `default_output_language` (skip the step-0 question if set), and `default_peer_sets`. For peers: an **empty** array `[]` for the ticker means "not set yet" → derive, confirm with the user, then **write the confirmed peers back into `config.json`** so the next run skips the derivation + re-search; a **non-empty** array is used as-is. If a needed value is absent, ask the user.
 
-**Local cache:** save every retrieved filing to the `cache_dir` from config (default `./research-cache/<ticker>/`, e.g. `./research-cache/002050.SZ/`); also where the user drops manual downloads. Check this folder first and read from disk before re-fetching.
+**Local cache (cache-first is mandatory — this is the biggest speed win):**
+- Save every retrieved filing to `cache_dir` (default `./research-cache/<ticker>/`); also where the user drops manual downloads.
+- **Before any download, list the cache folder and read from disk.** Only fetch what is genuinely absent — never re-download a filing already in the folder.
+- **Use `./fetch_filing.sh <ticker> <url> [basename]` for every filing download** (in this skill's dir). It is cache-first, routes through `filing_proxy`, retries, sets a browser UA, and converts the PDF to `.txt` once. Do **not** hand-roll `curl`/`pdftotext` retry loops — that is exactly what made past runs stall 7–18 min per file.
+- **Don't load whole annual-report PDFs into context.** After conversion, `grep`/extract only the relevant sections (薪酬章节 / 股权激励计划 / 考核办法 / 减持公告 / 关联交易) into a small `<ticker>/_extract_*.md` and read those. Dumping full filings is what pushed past runs to 160K-token context and made every later turn slow.
+
+## Execution Discipline (keep it fast)
+
+Past runs averaged 1.5–6 hours; the wall-clock went to three avoidable places. Hold to these:
+
+- **Locate filings by direct source, not WebSearch.** For A-share insider/holding data use **akshare-one MCP** and **tushare** directly (structured, fast) — don't search the web for it. For a specific filing PDF, go to the known disclosure host (cninfo / HKEXnews / EDGAR) and construct the URL; reserve WebSearch for the rare case with no structured source and no constructable URL. A single open-ended WebSearch for "find the annual report" has cost 30+ min — that is the failure mode to avoid.
+- **Limit subagents.** A single-company incentive analysis does **not** need a fan-out of one subagent per requirement — that pattern cost ~16 min per subagent and dominated total time. Do the data pulls and reasoning inline. Spin up **at most one** scoped subagent, and only for a genuinely separable, search-heavy chunk (e.g. building a peer's structure from scratch). Never run parallel subagents for the same company's sub-sections.
+- **Exhaust the cache and structured tools before fetching**, per the Local cache rules above.
 
 ## When a Primary Source Can't Be Reached
 
 A-share/HK filings often can't be fetched (blocked PDFs, timeouts, TLS/proxy errors; akshare/tushare don't cover 考核办法 or full 减持公告 text). For a **core** input (annual report, incentive plan, 减持/增持 disclosure), in order:
 
-1. **Try alternate tools** — akshare for the same data point, tushare for series data. Exhaust automated paths first.
+1. **Try alternate tools** — `fetch_filing.sh` (proxy-routed, retries) for the PDF; akshare for the same data point, tushare for series data. Exhaust automated paths first.
 2. **Still missing → STOP and ask the user.** Do not fabricate or substitute a secondary number for a core input. State: **what's missing** (exact document, e.g. "三花智控 2024年报"), **where to get it** (cninfo 公告页 / HKEXnews / EDGAR + search term), **where to put it** (`./research-cache/<ticker>/`, full path). Ask them to reply when done.
 3. **Resume** from the pause point when the user confirms — read from the cache folder, don't restart.
 4. **Labeled partial, last resort only** (user declines / file doesn't exist): mark each figure **[primary]** or **[secondary, unverified]**, leave blocked sections marked missing not guessed, end with a "Primary sources to confirm" checklist.
@@ -66,6 +78,10 @@ The stall is deliberate and informative — never silent, never a fabricated fil
 
 ## Output Format
 
+**Write the final report to disk, not just chat.** At the end of a run, save the full report as `<output_dir>/<ticker>-incentives-<YYYY-MM-DD>.md` — expand `output_dir` from `config.json` (default `~/Library/CloudStorage/OneDrive-个人/Kaisi work/CC output/executive-incentive-analysis/<ticker>/`, substituting `<ticker>`), create the folder if missing, then also render it in chat. The path contains spaces and non-ASCII — always quote it in shell. This is the deliverable folder; keep it separate from `cache_dir` (raw filings, extracts, scratch scripts stay in the cache, never in `output_dir`). If `output_dir` is absent from config, ask the user where to write before saving.
+
+The report sections:
+
 1. **Compensation table** (execs × cash/equity/total, latest FY + trend).
 2. **Structure & targets** — prose + targets sub-table if multi-tier + peer-comparison sub-table.
 3. **Incentive read** — what's rewarded + misalignment flags.
@@ -79,7 +95,7 @@ Every figure cites filing, period, URL. Keep granted vs. realized distinct. No b
 
 Hard-won failure points when running this skill on A-share / HK names. Check here first when data retrieval misbehaves.
 
-- **cninfo fetch fails with a TLS/cert error, but `curl` to the same host works** — the host is being resolved to a fake-IP (198.18.x.x) by a local proxy's fake-IP mode, and the fetch layer isn't using the proxy. Run with `HTTPS_PROXY`/`HTTP_PROXY` set to the proxy's local port so the fetch goes through it. Not a real certificate problem.
+- **cninfo fetch fails with a TLS/cert error, but `curl` to the same host works** — the host is being resolved to a fake-IP (198.18.x.x) by a local proxy's fake-IP mode, and the fetch layer isn't using the proxy. **Use `fetch_filing.sh`**, which routes through `filing_proxy` from `config.json` (default `http://127.0.0.1:1082`) — it handles this. If fetching by hand, set `HTTPS_PROXY`/`HTTP_PROXY` to that port. Not a real certificate problem.
 - **`api.tushare.pro` is http, not https** — proxy/cert tooling that assumes https will mishandle it.
 - **tushare `anns_d` returns no permission (40203)** — announcement text is gated. 减持公告 / 股权激励考核办法 text must come from cninfo or akshare, never assume tushare has it.
 - **akshare-one MCP shows 0 servers / won't start in the desktop app** — the GUI's PATH often lacks `/opt/homebrew/bin`, so `uvx` isn't found. Use the absolute path to `uvx` in `.mcp.json`. First launch also pulls deps (slow, ~1–2 min) — not a hang.
@@ -91,12 +107,14 @@ Hard-won failure points when running this skill on A-share / HK names. Check her
 
 ## Files
 
+- `fetch_filing.sh` — proxy-routed, cache-first filing downloader + PDF→text converter. Use for every filing fetch: `./fetch_filing.sh <ticker> <url> [basename]`.
 - `references/tushare-guide.md` — tushare endpoints, after-adjusted-price recipe, gotchas, snapshot template. Read when pulling A-share financials/prices.
-- `config.json` — token path, cache dir, default language, default peer sets. Read at start of run.
+- `config.json` — token path, cache dir, output dir, filing proxy, default language, default peer sets. Read at start of run.
 
 ---
 
-*Version 0.7 — last updated 2026-06-05*
+*Version 0.8 — last updated 2026-06-12*
+*0.8: performance + output — added `fetch_filing.sh` (proxy-routed, cache-first download + PDF→text) to replace hand-rolled retry loops; mandated cache-first + section-extraction (no whole-PDF context dumps); added "Execution Discipline" (locate via akshare/tushare not WebSearch; cap subagent fan-out); config.json gains `filing_proxy`, `output_dir` (final report written to a dedicated deliverable folder, separate from the cache), `default_output_language` defaulted, and self-populating peer-set slots for high-frequency tickers.*
 *0.7: folder structure — split tushare detail to references/tushare-guide.md, added config.json (token/cache/language/peers), added Gotchas section (proxy/cert, tushare/akshare boundaries, ts_code, block-trade lag, cap-rule timing).*
 *0.6: selling analysis — flag sales sized to the regulatory cap, and 10y post-sale outcome pattern (6-month stock/business change after each reduction); ESOP analysis — interrogate difficulty of achievement, esp. rigged peer-benchmark targets.*
 *0.5: condensed for density (removed explanatory prose and duplication; behavior unchanged).*

@@ -1,9 +1,22 @@
 {
   "tushare_token_path": "~/.config/tushare/token",
   "cache_dir": "./research-cache/<ticker>/",
-  "default_output_language": null,
+  "output_dir": "~/Library/CloudStorage/OneDrive-个人/Kaisi work/CC output/executive-incentive-analysis/<ticker>/",
+  "filing_proxy": "http://127.0.0.1:1082",
+  "default_output_language": "中文",
   "default_peer_sets": {
-    "_comment": "Optional. Pre-defined peer groups keyed by ticker, so the skill doesn't re-derive comparables each run. Leave empty to have the skill pick peers and confirm with the user. Example: \"002050.SZ\": [\"600690.SH\", \"002032.SZ\"]",
-    "002050.SZ": []
+    "_comment": "Peer groups keyed by ticker, so the skill doesn't re-derive comparables and re-search their filings every run. Self-populating: an EMPTY array [] means 'not set yet' — the skill derives peers, confirms with the user, then writes them back here. A NON-EMPTY array is used as-is (still confirm if stale). Pre-seeded below are the high-frequency names from past runs (≥3 sessions); fill each on its next run. Example: \"002050.SZ\": [\"600690.SH\", \"002032.SZ\"].",
+    "002050.SZ": [],
+    "300750.SZ": [],
+    "002594.SZ": [],
+    "002352.SZ": [],
+    "603379.SH": [],
+    "600160.SH": [],
+    "2020.HK": [],
+    "2331.HK": [],
+    "1368.HK": [],
+    "0325.HK": [],
+    "9992.HK": [],
+    "6181.HK": []
   }
 }
