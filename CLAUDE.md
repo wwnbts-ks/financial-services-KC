@@ -46,3 +46,21 @@ Run `python3 scripts/check.py` before committing — it lints every manifest, ve
 1. Edit markdown files directly - changes take effect immediately
 2. Test commands with `/plugin:command-name` syntax
 3. Skills are invoked automatically when their trigger conditions match
+
+### Local development loop (avoiding stale-skill surprises)
+
+A plugin you install locally (via the directory marketplace in `~/.claude`) is served from a **version-gated cache**: Claude Code only re-delivers a plugin when its `.claude-plugin/plugin.json` `version` changes. Because `version_bump.py` bumps a branch's version **once** (to one patch ahead of `main`), every edit you make *after* that first bump leaves the version unchanged — so your own installed copy keeps serving the cached snapshot and your new/edited skills never show up in your session. This is a *self-consumption* artifact, not a delivery bug: on merge to `main` the bumped version ships the final content to everyone. **Do not work around it by inflating the version per-commit.**
+
+To iterate on a skill and see edits without bumping/reinstalling, live-load it as a **project skill** (read fresh every session, not cached, not version-gated):
+
+```
+scripts/dev-link-skill.sh <vertical> <skill>   # symlink into .claude/skills/ (gitignored)
+# edit the skill in plugins/vertical-plugins/<vertical>/skills/<skill>/, then RESTART the session
+scripts/dev-link-skill.sh --unlink <skill>     # remove when the skill is stable
+```
+
+`.claude/skills/` is gitignored so dev links stay local (a committed link would make every clone load a duplicate of a skill that already ships in the plugin). To validate the *packaged* plugin form before release, bump the patch version, update the plugin in Claude Code, and restart — reserve that for final QA, not routine iteration.
+
+### Pulling Anthropic's upstream updates
+
+This repo is installed as a local **directory** marketplace, so Claude Code's "upstream" is this directory — official upgrades from `anthropics/financial-services` (the `upstream` remote) do **not** arrive automatically. Run `scripts/pull-upstream.sh` to fetch upstream, fast-forward local `main`, and merge it into your customization branch (it stops on conflicts and never pushes). Then update the plugin in Claude Code and restart the session so the new skills reload.
