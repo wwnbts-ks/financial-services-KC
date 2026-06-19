@@ -21,11 +21,11 @@ For dual-listed/VIE names, reconcile across regimes and flag where disclosures d
 
 **A-share tooling** (faster path to the same primary data, never a substitute for citing the filing): use **akshare-one MCP** for 高管增减持/持股变动 (primary tool for the step-4 bridge); use the **tushare SDK** for shares outstanding, market cap, and financial base (income/balance sheet/ratios, after-adjusted prices). For tushare endpoints, the after-adjusted-price recipe, rate-limit/format gotchas, and a one-shot snapshot template, read `references/tushare-guide.md`. tushare can't supply 考核办法 or 减持公告 text (gated `anns_d`) — those come from cninfo or akshare.
 
-**Setup (`config.json`).** Read `config.json` at the start of a run for: `tushare_token_path`, `cache_dir`, `output_dir` (where the final report is written — see Output Format), `filing_proxy` (the local proxy port to route filing downloads through — required for cninfo, see Gotchas), `default_output_language` (skip the step-0 question if set), and `default_peer_sets`. For peers: an **empty** array `[]` for the ticker means "not set yet" → derive, confirm with the user, then **write the confirmed peers back into `config.json`** so the next run skips the derivation + re-search; a **non-empty** array is used as-is. If a needed value is absent, ask the user.
+**Setup (`config.json`).** Read `config.json` at the start of a run for: `tushare_token_path`, `cache_dir`, `output_dir` (where the final report is written — see Output Format), `filing_proxy` (the local proxy port to route filing downloads through — required for cninfo, see Gotchas), `default_output_language` (skip the step-0 question if set), `local_filings_dirs` (per-ticker local folder of the user's own filings — check it before any fetch, see step 0.5), and `default_peer_sets`. For peers: an **empty** array `[]` for the ticker means "not set yet" → derive, confirm with the user, then **write the confirmed peers back into `config.json`** so the next run skips the derivation + re-search; a **non-empty** array is used as-is. If a needed value is absent, ask the user.
 
 **Local cache (cache-first is mandatory — this is the biggest speed win):**
 - Save every retrieved filing to `cache_dir` (default `./research-cache/<ticker>/`); also where the user drops manual downloads.
-- **Before any download, list the cache folder and read from disk.** Only fetch what is genuinely absent — never re-download a filing already in the folder.
+- **Before any download, read from disk first — both the user's `local_filings_dirs` folder (step 0.5) and `cache_dir`.** Only fetch what is genuinely absent from both — never re-download a filing the user already has locally or that's already in the cache.
 - **Use `./fetch_filing.sh <ticker> <url> [basename]` for every filing download** (in this skill's dir). It is cache-first, routes through `filing_proxy`, retries, sets a browser UA, and converts the PDF to `.txt` once. Do **not** hand-roll `curl`/`pdftotext` retry loops — that is exactly what made past runs stall 7–18 min per file.
 - **Don't load whole annual-report PDFs into context.** After conversion, `grep`/extract only the relevant sections (薪酬章节 / 股权激励计划 / 考核办法 / 减持公告 / 关联交易) into a small `<ticker>/_extract_*.md` and read those. Dumping full filings is what pushed past runs to 160K-token context and made every later turn slow.
 
@@ -41,7 +41,7 @@ Past runs averaged 1.5–6 hours; the wall-clock went to three avoidable places.
 
 A-share/HK filings often can't be fetched (blocked PDFs, timeouts, TLS/proxy errors; akshare/tushare don't cover 考核办法 or full 减持公告 text). For a **core** input (annual report, incentive plan, 减持/增持 disclosure), in order:
 
-1. **Try alternate tools** — `fetch_filing.sh` (proxy-routed, retries) for the PDF; akshare for the same data point, tushare for series data. Exhaust automated paths first.
+1. **Check local first, then alternate tools** — look in the user's `local_filings_dirs` folder (step 0.5) and `cache_dir` before fetching; then `fetch_filing.sh` (proxy-routed, retries) for the PDF; akshare for the same data point, tushare for series data. Exhaust local + automated paths first.
 2. **Still missing → STOP and ask the user.** Do not fabricate or substitute a secondary number for a core input. State: **what's missing** (exact document, e.g. "三花智控 2024年报"), **where to get it** (cninfo 公告页 / HKEXnews / EDGAR + search term), **where to put it** (`./research-cache/<ticker>/`, full path). Ask them to reply when done.
 3. **Resume** from the pause point when the user confirms — read from the cache folder, don't restart.
 4. **Labeled partial, last resort only** (user declines / file doesn't exist): mark each figure **[primary]** or **[secondary, unverified]**, leave blocked sections marked missing not guessed, end with a "Primary sources to confirm" checklist.
@@ -51,6 +51,13 @@ The stall is deliberate and informative — never silent, never a fabricated fil
 ## Workflow
 
 **0. Output language.** If `config.json` sets `default_output_language`, use it. Otherwise ask: 中文为主还是英文为主. Keep proper nouns, filing names, financial terms in original form either way (减持公告, DEF 14A, RSU). Don't re-ask within a run.
+
+**0.5 Local source folder — check before any fetch (biggest time saver).** Before fetching anything online, find out whether the user already has this company's filings/transcripts on disk:
+- If `config.json`'s `local_filings_dirs` has a path for this ticker, use it (confirm it still exists; don't re-ask). Otherwise **ask once**: "这家公司的财报/公告/transcript 有没有已经存在本地某个文件夹?有的话给我路径(没有就直接说没有)。" If none, proceed with cache + online fetch as before.
+- Given a folder: **list it recursively, index the files, and map each to a requirement** — 年报/中报 → Req 1/2 (holdings, comp, option scheme); 股权激励计划/考核办法 → Req 2 (targets); 减持/增持公告 · DI forms (Form 3A/3B etc.) → Req 4 (stake bridge); 关联交易公告 → Req 5. **Read these in place first**, extracting only the needed sections into `cache_dir/<ticker>/_extract_*.md` as usual (don't copy whole PDFs around).
+- **Then fetch only the gap.** Diff required-docs against what the folder supplies; go online (structured tools → `fetch_filing.sh`) only for what's genuinely missing, per Execution Discipline. Note explicitly which inputs came from the local folder vs. were fetched.
+- **Write the confirmed path back into `config.json` `local_filings_dirs[<ticker>]`** so the next run uses it without asking (same self-populating pattern as `default_peer_sets`).
+- Treat folder files as **primary** sources (they are the user's own downloads of filings) — still cite filing / period / URL where determinable; if a local file's provenance is unclear, flag it rather than assume. Paths may contain spaces / non-ASCII — always quote in shell.
 
 **1. Define key management.** Executive management only — executive directors + senior management (US: NEOs; A-share: 执行董事 + 高管). **Exclude** non-executive/independent directors and A-share 监事. State who is in scope.
 
@@ -115,7 +122,8 @@ Hard-won failure points when running this skill on A-share / HK names. Check her
 
 ---
 
-*Version 0.8.2 — last updated 2026-06-19*
+*Version 0.9 — last updated 2026-06-19*
+*0.9: local-folder-first — added workflow step 0.5: before any online fetch, check whether the user has a local folder of the company's filings/transcripts (new `local_filings_dirs` config key, self-populating per ticker like peer sets); index it, map files to requirements, read in place, and fetch only the gap. Threaded the local folder into the Local-cache rule and the "can't reach a source" fallback as the first place to look.*
 *0.8.2: HK staleness gap — added a gotcha that a periodic report freezes each director's/CE's holding at the period-end only; post-period dealings live solely in the SDI / `di.hkex.com.hk` DI/DION system (Form 3A/3B, 3 business days), so the step-4 bridge must query the DI system from the report's period-end through the analysis date and state the holding's as-of date.*
 *0.8.1: HK insider source — clarified the two-tier HK regime: the annual report (App D2 / PN5) carries only the year-end s.352 interests snapshot + option-scheme movements, while the transaction-by-transaction dated buy/sell/pledge records (Form 3A/3B, 3 business days) live in the Disclosure of Interests (DI/DION) system `di.hkex.com.hk` — use the annual report for Req 1/2 holdings/structure and the DI filings for the step-4 stake bridge.*
 *0.8: performance + output — added `fetch_filing.sh` (proxy-routed, cache-first download + PDF→text) to replace hand-rolled retry loops; mandated cache-first + section-extraction (no whole-PDF context dumps); added "Execution Discipline" (locate via akshare/tushare not WebSearch; cap subagent fan-out); config.json gains `filing_proxy`, `output_dir` (final report written to a dedicated deliverable folder, separate from the cache), `default_output_language` defaulted, and self-populating peer-set slots for high-frequency tickers.*
